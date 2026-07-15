@@ -19,6 +19,8 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#include <map>
+#include <vector>
 
 int main(void) {
     int in_fd = socket(AF_INET, SOCK_DGRAM, 0);
@@ -38,12 +40,52 @@ int main(void) {
     player.sin_addr.s_addr = inet_addr("127.0.0.1");
 
     unsigned char buf[2048];
+    // Map automatically sorts packets by sequence number
+    std::map<uint32_t, std::vector<unsigned char>> jitter_buffer;
+    uint32_t next_expected = 0;
+    bool first_packet = true;
+
     for (;;) {
         ssize_t n = recvfrom(in_fd, buf, sizeof buf, 0, NULL, NULL);
         if (n <= 0) continue;
-        /* jitter buffer / reorder / recovery logic goes here */
-        sendto(out_fd, buf, (size_t)n, 0, (struct sockaddr *)&player,
-               sizeof player);
+
+        // Extract sequence number (network to host byte order)
+        uint32_t seq;
+        memcpy(&seq, buf, 4);
+        seq = ntohl(seq);
+
+        if (first_packet) {
+            next_expected = seq;
+            first_packet = false;
+        }
+
+        // 1. Store the current packet if we don't have it and it's not too late
+        if (seq >= next_expected && jitter_buffer.find(seq) == jitter_buffer.end()) {
+            jitter_buffer[seq] = std::vector<unsigned char>(buf, buf + 164);
+        }
+
+        // 2. Recover the previous packet from the redundant data if needed
+        if (n == 324 && seq > 0) {
+            uint32_t prev_seq = seq - 1;
+            if (prev_seq >= next_expected && jitter_buffer.find(prev_seq) == jitter_buffer.end()) {
+                std::vector<unsigned char> recovered_pkt(164);
+                uint32_t net_prev_seq = htonl(prev_seq);
+                
+                // Reconstruct the 164-byte frame: 4-byte seq + 160-byte payload
+                memcpy(recovered_pkt.data(), &net_prev_seq, 4);
+                memcpy(recovered_pkt.data() + 4, buf + 164, 160);
+                
+                jitter_buffer[prev_seq] = recovered_pkt;
+            }
+        }
+
+        // 3. Play out all contiguous frames available in the buffer
+        while (jitter_buffer.find(next_expected) != jitter_buffer.end()) {
+            sendto(out_fd, jitter_buffer[next_expected].data(), 164, 0, 
+                   (struct sockaddr *)&player, sizeof player);
+            jitter_buffer.erase(next_expected);
+            next_expected++;
+        }
     }
     return 0;
 }

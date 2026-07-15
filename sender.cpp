@@ -38,13 +38,30 @@ int main(void) {
     relay.sin_port = htons(47001);
     relay.sin_addr.s_addr = inet_addr("127.0.0.1");
 
-    unsigned char buf[2048];
+    unsigned char in_buf[2048];
+    unsigned char out_buf[2048];
+    unsigned char prev_payload[160] = {0};
+    bool has_prev = false;
+
     for (;;) {
-        ssize_t n = recvfrom(in_fd, buf, sizeof buf, 0, NULL, NULL);
-        if (n <= 0) continue;
-        /* your protocol design goes here; baseline = send once, as-is */
-        sendto(out_fd, buf, (size_t)n, 0, (struct sockaddr *)&relay,
-               sizeof relay);
+        ssize_t n = recvfrom(in_fd, in_buf, sizeof in_buf, 0, NULL, NULL);
+        if (n != 164) continue; // 4-byte seq + 160-byte payload
+
+        // Copy sequence number and current payload to out_buf
+        memcpy(out_buf, in_buf, 164);
+
+        if (has_prev) {
+            // Append the previous payload
+            memcpy(out_buf + 164, prev_payload, 160);
+            sendto(out_fd, out_buf, 324, 0, (struct sockaddr *)&relay, sizeof relay);
+        } else {
+            // First packet has no previous payload
+            sendto(out_fd, out_buf, 164, 0, (struct sockaddr *)&relay, sizeof relay);
+        }
+
+        // Store current payload for the next loop
+        memcpy(prev_payload, in_buf + 4, 160);
+        has_prev = true;
     }
     return 0;
 }
