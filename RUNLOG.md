@@ -14,3 +14,4 @@
 | B.json | 200 | 0.47% | 1.81x | **Baseline Validated:** Found the safe floor for Profile B. High NACK volume pushed overhead to 1.81x, but misses are safely under 1%. |
 | B.json | 175 | 2.60% | 1.77x | **Optimization (Binary Search):** 175ms is too tight for Profile B. Latency spikes caused rescue packets to miss the deadline. |
 | B.json | 187 | 1.07% | 1.84x | **Optimization (Binary Search):** Failed by a single frame. The 187ms deadline is just barely too strict for the worst latency spikes on Profile B. |
+| B.json | 194 | 0.93% | 1.87x | **Final Result:** Found the optimal valid delay. 194ms is the lowest score that maintains <1% misses under the extreme loss conditions of Profile B. |
