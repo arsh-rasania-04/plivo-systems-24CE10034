@@ -8,3 +8,5 @@
 | A.json | 150 | 0.00% | 1.16x | **Baseline Validated:** Increased the delay budget to allow sufficient time for NACK rescue packets to traverse the network. Achieved a perfect 0% miss rate. |
 | A.json | 125 | 0.13% | 1.15x | **Optimization (Binary Search):** Tested the midpoint to lower the score. Safely below the 1.00% cap. |
 | A.json | 112 | 0.27% | 1.14x | **Optimization (Binary Search):** Continued narrowing the valid boundary. |
+| A.json | 106 | 0.53% | 1.15x | **Optimization (Binary Search):** Found the near-optimal floor for Profile A. |
+| B.json | 106 | 5.33% | 1.54x | **Stress Test:** Profile B has much higher packet loss (163 drops). The 106ms delay does not provide enough time for the increased volume of NACK round-trips. |
