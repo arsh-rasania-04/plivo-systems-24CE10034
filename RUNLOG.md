@@ -11,3 +11,4 @@
 | A.json | 106 | 0.53% | 1.15x | **Optimization (Binary Search):** Found the near-optimal floor for Profile A. |
 | B.json | 106 | 5.33% | 1.54x | **Stress Test:** Profile B has much higher packet loss (163 drops). The 106ms delay does not provide enough time for the increased volume of NACK round-trips. |
 | B.json | 150 | 3.87% | 1.72x | **Stress Test:** Increased delay to 150ms, but the high packet loss (193 drops) and variable RTT of Profile B still caused rescue packets to arrive late. |
+| B.json | 200 | 0.47% | 1.81x | **Baseline Validated:** Found the safe floor for Profile B. High NACK volume pushed overhead to 1.81x, but misses are safely under 1%. |
