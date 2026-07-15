@@ -53,6 +53,7 @@ int main(void) {
 
     unsigned char buf[2048];
     for (;;) {
+        //poll multiplexes between incoming data and NACKs without blocking the process
         int ret = poll(fds, 2, -1);
         if (ret < 0) continue;
 
@@ -61,8 +62,9 @@ int main(void) {
             if (n == 164) {
                 uint32_t seq;
                 memcpy(&seq, buf, 4);
+                // Convert sequence number to host order to correctly process data
                 seq = ntohl(seq);
-                
+                // history buffer for potential retransmissions (ARQ)
                 history[seq] = std::vector<unsigned char>(buf, buf + 164);
                 if (history.size() > 500) history.erase(history.begin());
                 
@@ -75,8 +77,9 @@ int main(void) {
             if (n == 4) {
                 uint32_t nack_seq;
                 memcpy(&nack_seq, buf, 4);
+                // Checking if NACK sequence number is interpreted correctly in host order
                 nack_seq = ntohl(nack_seq);
-                
+                // If the requested packet is in the history, resend it to the relay
                 if (history.find(nack_seq) != history.end()) {
                     sendto(out_fd, history[nack_seq].data(), 164, 0, 
                            (struct sockaddr *)&relay, sizeof relay);

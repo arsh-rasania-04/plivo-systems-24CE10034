@@ -2,7 +2,7 @@ CXX ?= g++
 CXXFLAGS ?= -O2 -Wall -std=c++17
 
 all: sender receiver
-
+# Compile the sender application
 sender: sender.cpp
 	$(CXX) $(CXXFLAGS) -o sender sender.cpp
 

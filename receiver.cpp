@@ -65,7 +65,7 @@ int main(void) {
     fds[0].events = POLLIN;
 
     for (;;) {
-        // 1. Play contiguous frames IMMEDIATELY to guarantee they arrive early
+        // 1. contiguous frames played immediately
         while (buffer.find(next_play) != buffer.end()) {
             sendto(out_fd, buffer[next_play].data(), 164, 0, (struct sockaddr *)&player, sizeof player);
             buffer.erase(next_play);
@@ -73,18 +73,18 @@ int main(void) {
             next_play++;
         }
 
-        // 2. Calculate the strict deadline for the current missing frame
+        // 2. Deadline for the current missing frame
         double now = get_time();
         double deadline = t0 + delay_sec + (next_play * 0.020);
         
-        // If time runs out, skip it instantly to prevent stalling the rest of the stream
+        // If no time left, skip : this prevents stalling the rest of the stream
         if (now >= deadline) {
             missing.erase(next_play);
             next_play++;
             continue; 
         }
 
-        // 3. Wait for rescue packets, but ONLY up to the deadline
+        // 3. Wait for rescue packets, till deadline only
         double wait_sec = deadline - now;
         int wait_ms = (int)(wait_sec * 1000);
         if (wait_ms < 0) wait_ms = 0;
@@ -110,7 +110,7 @@ int main(void) {
                 }
                 missing.erase(seq);
 
-                // Aggressively send NACKs for all detected gaps
+                // Send NACK for every detected gap
                 for (auto it = missing.begin(); it != missing.end(); ++it) {
                     uint32_t net_seq = htonl(*it);
                     sendto(nack_fd, &net_seq, 4, 0, (struct sockaddr *)&relay_nack, sizeof relay_nack);
