@@ -1,0 +1,3 @@
+Design: Our receiver utilizes a C++ jitter buffer implemented with a std::map to handle out-of-order packets and a playout timer for sequential delivery. We employ an aggressive ARQ mechanism that transmits NACKs immediately upon detecting a missing sequence number, balancing packet recovery against a 2.00x bandwidth overhead cap.
+Grading Delay: We recommend a grading delay of 194ms.
+What Breaks It: The design fails if the delay is set below 194ms for Profile B, as the round-trip time required for NACK-based recovery exceeds the playout deadline. Additionally, the system would reach the bandwidth limit if network loss rates significantly exceed those observed in the stress test profiles, as the NACK volume would grow proportionally to the number of missing packets.
