@@ -19,72 +19,70 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <unistd.h>
-#include <map>
-#include <vector>
+#include <set>
 
 int main(void) {
+    // 1. Setup Relay Input (47002)
     int in_fd = socket(AF_INET, SOCK_DGRAM, 0);
     struct sockaddr_in in_addr = {0};
     in_addr.sin_family = AF_INET;
     in_addr.sin_port = htons(47002);
     in_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
-    if (bind(in_fd, (struct sockaddr *)&in_addr, sizeof in_addr) < 0) {
-        perror("bind 47002");
-        return 1;
-    }
+    bind(in_fd, (struct sockaddr *)&in_addr, sizeof in_addr);
 
+    // 2. Setup Player Output (47020)
     int out_fd = socket(AF_INET, SOCK_DGRAM, 0);
     struct sockaddr_in player = {0};
     player.sin_family = AF_INET;
     player.sin_port = htons(47020);
     player.sin_addr.s_addr = inet_addr("127.0.0.1");
+    
+    // 3. Setup NACK Output (47003)
+    int nack_out_fd = socket(AF_INET, SOCK_DGRAM, 0);
+    struct sockaddr_in relay_nack = {0};
+    relay_nack.sin_family = AF_INET;
+    relay_nack.sin_port = htons(47003);
+    relay_nack.sin_addr.s_addr = inet_addr("127.0.0.1");
 
     unsigned char buf[2048];
-    // Map automatically sorts packets by sequence number
-    std::map<uint32_t, std::vector<unsigned char>> jitter_buffer;
-    uint32_t next_expected = 0;
-    bool first_packet = true;
+    uint32_t max_seq = 0;
+    bool first = true;
+    std::set<uint32_t> missing;
 
     for (;;) {
         ssize_t n = recvfrom(in_fd, buf, sizeof buf, 0, NULL, NULL);
         if (n <= 0) continue;
 
-        // Extract sequence number (network to host byte order)
         uint32_t seq;
         memcpy(&seq, buf, 4);
         seq = ntohl(seq);
 
-        if (first_packet) {
-            next_expected = seq;
-            first_packet = false;
-        }
+        // INSTANT PLAYOUT: Fixes head-of-line blocking
+        sendto(out_fd, buf, n, 0, (struct sockaddr *)&player, sizeof player);
 
-        // 1. Store the current packet if we don't have it and it's not too late
-        if (seq >= next_expected && jitter_buffer.find(seq) == jitter_buffer.end()) {
-            jitter_buffer[seq] = std::vector<unsigned char>(buf, buf + 164);
-        }
-
-        // 2. Recover the previous packet from the redundant data if needed
-        if (n == 324 && seq > 0) {
-            uint32_t prev_seq = seq - 1;
-            if (prev_seq >= next_expected && jitter_buffer.find(prev_seq) == jitter_buffer.end()) {
-                std::vector<unsigned char> recovered_pkt(164);
-                uint32_t net_prev_seq = htonl(prev_seq);
-                
-                // Reconstruct the 164-byte frame: 4-byte seq + 160-byte payload
-                memcpy(recovered_pkt.data(), &net_prev_seq, 4);
-                memcpy(recovered_pkt.data() + 4, buf + 164, 160);
-                
-                jitter_buffer[prev_seq] = recovered_pkt;
+        // Gap Detection Logic
+        if (first) {
+            max_seq = seq;
+            first = false;
+        } else {
+            if (seq > max_seq) {
+                for (uint32_t i = max_seq + 1; i < seq; ++i) {
+                    missing.insert(i);
+                }
+                max_seq = seq;
             }
+            missing.erase(seq); // We got it, remove from missing set
         }
 
-        // 3. Play out all contiguous frames available in the buffer
-        while (jitter_buffer.find(next_expected) != jitter_buffer.end()) {
-            sendto(out_fd, jitter_buffer[next_expected].data(), 164, 0, 
-                   (struct sockaddr *)&player, sizeof player);
-            jitter_buffer.erase(next_expected);
-            next_expected++;
+        // Keep the set clean from ancient lost packets
+        while (!missing.empty() && max_seq > *missing.begin() && (max_seq - *missing.begin()) >= 200) {
+            missing.erase(missing.begin());
+        }
+
+        // Blast NACKs for remaining missing packets
+        for (auto it = missing.begin(); it != missing.end(); ++it) {
+            uint32_t net_seq = htonl(*it);
+            sendto(nack_out_fd, &net_seq, 4, 0, (struct sockaddr *)&relay_nack, sizeof relay_nack);
         }
     }
     return 0;
