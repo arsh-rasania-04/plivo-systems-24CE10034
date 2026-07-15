@@ -1,8 +1,8 @@
 {
- "up_bytes": 278964,
- "down_bytes": 804,
- "up_pkts": 1701,
- "down_pkts": 201,
- "dropped": 41,
- "duplicated": 13
+ "up_bytes": 442964,
+ "down_bytes": 5016,
+ "up_pkts": 2701,
+ "down_pkts": 1254,
+ "dropped": 215,
+ "duplicated": 42
 }
