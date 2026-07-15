@@ -13,3 +13,4 @@
 | B.json | 150 | 3.87% | 1.72x | **Stress Test:** Increased delay to 150ms, but the high packet loss (193 drops) and variable RTT of Profile B still caused rescue packets to arrive late. |
 | B.json | 200 | 0.47% | 1.81x | **Baseline Validated:** Found the safe floor for Profile B. High NACK volume pushed overhead to 1.81x, but misses are safely under 1%. |
 | B.json | 175 | 2.60% | 1.77x | **Optimization (Binary Search):** 175ms is too tight for Profile B. Latency spikes caused rescue packets to miss the deadline. |
+| B.json | 187 | 1.07% | 1.84x | **Optimization (Binary Search):** Failed by a single frame. The 187ms deadline is just barely too strict for the worst latency spikes on Profile B. |
